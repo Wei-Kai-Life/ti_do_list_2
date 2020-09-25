@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TO-DO LIST</title>
+    <link rel="stylesheet" href="./reset.css">
+    <link rel="stylesheet" href="./to_do_list.css">
+</head>
+
+<body>
+    <div id="app">
+        <div class="list_container" @click="reSetInput()">
+            <div class="heading">TO-DO LIST</div>
+            <!-- 新增欄位區塊 -->
+            <div class="add_space">
+                <input class="add_content" type="text" placeholder="請輸入待辦事項" v-model.trim="addContent"
+                    @keyup.enter="addHandler()">
+                <div class="add_icon" @click="addHandler()"></div>
+            </div>
+            <!-- 完成、未完成按鈕 -->
+            <div class="check_btns">
+                <div class="this_all_btn" :class="buttonClicked(theAllBtn)" @click.stop=" clickTheAllButton() ">All
+                </div>
+                <div class="this_to_do_btn" :class=" buttonClicked(theToDoBtn)" @click.stop=" clickToDoButton() ">未完成
+                </div>
+                <div class="this_today_btn" :class="buttonClicked(theTodayBtn)" @click.stop=" clickTodayButton()  ">今天新增
+                </div>
+                <div class="this_finished_btn" :class="buttonClicked(theFinishedBtn)"
+                    @click.stop="clickFinishedButton() ">完成
+                </div>
+            </div>
+            <!-- 待辦欄位區塊 -->
+            <div class="to_do_space" :class="{to_do_space_switch: isCloseToDoSpace }"
+                v-if="this.typeButton !== this.theFinishedBtn ">
+                <h3 class="title">待辦事項</h3>
+                <!-- 待辦欄位區塊 v-for位置 -->
+                <div class="to_do_flex" v-for="(item,index) in filteredToDoItem " >
+                    <div class="to_do_items">
+                        <div class="to_do_item" @click="modifyHandler(index)"
+                            v-show="!filteredToDoItem[index].isEditing">
+                            {{index + 1}}. {{item.content}}</div>
+                        <div class="hide_to_do_item" v-show="filteredToDoItem[index].isEditing">
+                            <input class="to_do_item_input" type="text" :placeholder="item.content"
+                                v-model.trim="item.content" @keyup.enter="finishedModifyHandler(index)">
+                        </div>
+                    </div>
+                    <div class="to_do_icons">
+                        <div class="finished_modify_icon" v-if="filteredToDoItem[index].isEditing"
+                            @click="finishedModifyHandler(index)"></div>
+                        <div class="to_do_finished_icon" v-if="!isEditStatus" @click="finishHandler(index)"></div>
+                        <div class="to_do_trash_icon" v-if="!isEditStatus" @click.stop="deleteToDoItem(index)"></div>
+                    </div>
+                </div>
+            </div>
+            <!-- 完成區塊 -->
+            <div class="finished_space" :class="{finished_space_switch: isCloseFinishedSpace}"
+                v-if="this.typeButton === this.theAllBtn || this.typeButton === this.theFinishedBtn ">
+                <h3 class="title">完成事項</h3>
+                <span class="clear_all" @click="clearAll()">(清除所有項目)</span>
+                <!-- 完成區塊 v-for位置 -->
+                <div class="finished_flex" v-for="(item,index) in finishedItems">
+                    <div class="finished_items">
+                        <div class="finished_item">{{index + 1}}. {{item.content}}</div>
+                    </div>
+                    <div class="finished_icons">
+                        <div class="finished_return_icon" @click.stop="finished_returnHandler(index)"></div>
+                        <div class="finished_trash_icon" @click.stop="deleteFinishItem(index)"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.12/vue.js'></script>
+    <script>
+        let vm = new Vue({
+    el: '#app',
+    data: {
+        // 按鈕
+        theAllBtn: 0,
+        theToDoBtn: 1,
+        theTodayBtn: 2,
+        theFinishedBtn: 3,
+        // 目前按鈕
+        typeButton: 0,
+        // 區域切換
+        isCloseToDoSpace: false,
+        isCloseFinishedSpace: false,
+        // 輸入欄新增內容
+        addContent: '',
+        // 目前有無在編輯狀態（不限定特定index項目）
+        isEditStatus: false,
+        // 上一個編輯事項的index
+        preEditIdx: -1,
+        // 編輯事項的index
+        editingIdx: -1,
+        // 暫存內容
+        preTempContent: '',
+        tempContent: '',
+        // 待辦區
+        toDoItems: [{
+                content: '寫功課',
+                isEditing: false,
+                isFinished: false,
+                isDelete: false,
+                theDate: '2020/9/7',
+            },
+            {
+                content: '吃點心',
+                isEditing: false,
+                isFinished: false,
+                isDelete: false,
+                theDate: '2020/9/8'
+            },
+            {
+                content: '看電視',
+                isEditing: false,
+                isFinished: false,
+                isDelete: false,
+                theDate: '2020/9/8'
+            },
+        ],
+        // 完成區
+        finishedItems: [],
+    },
+    computed: {
+        filteredToDoItem() {
+            if (this.typeButton === this.theTodayBtn) {
+                let recordDate = new Date()
+                return this.toDoItems.filter(item => {
+                    return item.theDate === `${recordDate.getFullYear()}/${(recordDate.getMonth() + 1)}/${recordDate.getDate()}`
+                })
+            } else {
+                return this.toDoItems
+            }
+        },
+    },
+    methods: {
+        // 啟動按鈕觸動 buttonClicked 給予背景色
+        // 假若為輸入狀態，無法進行分頁切換
+        clickTheAllButton() {
+            if (this.isEditStatus !== true) {
+                this.typeButton = this.theAllBtn
+            }
+        },
+        clickToDoButton() {
+            if (this.isEditStatus !== true) {
+                this.typeButton = this.theToDoBtn
+            }
+        },
+        clickTodayButton() {
+            if (this.isEditStatus !== true) {
+                this.typeButton = this.theTodayBtn
+            }
+        },
+        clickFinishedButton() {
+            if (this.isEditStatus !== true) {
+                this.typeButton = this.theFinishedBtn
+            }
+        },
+        // 給予按鈕背景色
+        buttonClicked(number) {
+            return {
+                this_all_btn_act: this.typeButton === number
+            }
+        },
+        // 將新增事項push到待辦
+        addHandler() {
+            if (this.addContent) {
+                let recordDate = new Date()
+                this.toDoItems.push({
+                    content: this.addContent,
+                    isEditing: false,
+                    isFinished: false,
+                    isDelete: false,
+                    theDate: `${recordDate.getFullYear()}/${(recordDate.getMonth() + 1)}/${recordDate.getDate()}`
+                })
+                this.addContent = ''
+            }
+        },
+        // 待辦事項到完成區
+        finishHandler(index) {
+            if (this.typeButton === this.theTodayBtn) {
+                this.filteredToDoItem[index].isFinished = true
+                const findDeleteIndex = this.toDoItems.findIndex(item => {
+                    return item.isFinished === true
+                })
+                this.finishedItems.push({
+                    content: this.toDoItems[findDeleteIndex].content,
+                    isEditing: false,
+                    isFinished: true,
+                    isDelete: false,
+                    theDate: this.toDoItems[findDeleteIndex].theDate,
+                })
+                this.toDoItems.splice(findDeleteIndex, 1)
+            } else {
+                this.finishedItems.push({
+                    content: this.toDoItems[index].content,
+                    isEditing: false,
+                    isFinished: true,
+                    isDelete: false,
+                    theDate: this.toDoItems[index].theDate,
+                })
+                this.toDoItems.splice(index, 1)
+            }
+            this.editingIdx = -1
+            this.preEditIdx = -1
+        },
+        // 完成項目return回去待辦
+        finished_returnHandler(index) {
+            this.toDoItems.push({
+                content: this.finishedItems[index].content,
+                isEditing: false,
+                isFinished: false,
+                isDelete: false,
+                theDate: this.finishedItems[index].theDate,
+            })
+            this.finishedItems.splice(index, 1)
+        },
+        // 刪掉待辦事項
+        deleteToDoItem(index) {
+            if (this.typeButton === this.theTodayBtn) {
+                this.filteredToDoItem[index].isDelete = true
+                const findDeleteIndex = this.toDoItems.findIndex(item => {
+                    return item.isDelete === true
+                })
+                this.toDoItems.splice(findDeleteIndex, 1)
+            } else {
+                this.toDoItems.splice(index, 1)
+            }
+            this.editingIdx = -1
+            this.preEditIdx = -1
+        },
+        // 刪掉完成事項
+        deleteFinishItem(index) {
+            this.finishedItems.splice(index, 1)
+        },
+         // 點選事項做更改的動作
+         modifyHandler(index) {
+            this.isEditStatus = true
+            this.preEditIdx = this.editingIdx
+            this.editingIdx = index
+            this.preTempContent = this.tempContent
+            if (this.typeButton === this.theTodayBtn) {
+                this.tempContent = this.filteredToDoItem[index].content
+                this.filteredToDoItem[index].isEditing = true
+            } else {
+                this.tempContent = this.toDoItems[index].content
+                this.toDoItems[index].isEditing = true
+            }
+        },
+        // '按圖示' or '按Enter' 完成更改
+        finishedModifyHandler(index) {
+            if (this.typeButton === this.theTodayBtn) {
+                if (!this.filteredToDoItem[index].content) {
+                    this.filteredToDoItem[index].content = this.tempContent
+                }
+                this.filteredToDoItem[index].isEditing = false
+            } else {
+                if (!this.toDoItems[index].content) {
+                    this.toDoItems[index].content = this.tempContent
+                }
+                this.toDoItems[index].isEditing = false
+            }
+            this.isEditStatus = false
+        },
+        // 防止出現空白項目 & 取消上一個項目的編輯狀態
+        reSetInput() {
+            if (this.typeButton === this.theTodayBtn && this.preEditIdx !== -1 && this.preEditIdx !== this.editingIdx) {
+                if (!this.filteredToDoItem[this.preEditIdx].content) {
+                    this.filteredToDoItem[this.preEditIdx].content = this.preTempContent
+                }
+                this.filteredToDoItem[this.preEditIdx].isEditing = false
+            } else if (this.preEditIdx !== -1 && this.preEditIdx !== this.editingIdx) {
+                if (!this.toDoItems[this.preEditIdx].content) {
+                    this.toDoItems[this.preEditIdx].content = this.preTempContent
+                }
+                this.toDoItems[this.preEditIdx].isEditing = false
+            }
+        },
+        // 清除完成區所有項目
+        clearAll() {
+            let total_length = this.finishedItems.length
+            for (let i = 0; i < total_length; i++) {
+                this.finishedItems.splice(0, 1)
+            }
+        },
+    },
+})
+    </script>
+
+
+</body>
+
+</html>
